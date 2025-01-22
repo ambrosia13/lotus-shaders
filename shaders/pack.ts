@@ -1,0 +1,3 @@
+function setupShader() {
+    Gbuffer.setup();
+}

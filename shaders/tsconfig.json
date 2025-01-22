@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "strict": false,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "target": "es2022",
+        "lib": [
+            "es2022"
+        ]
+    },
+    "files": [
+        "scripts/gbuffer.ts",
+        "scripts/iris.d.ts",
+        "pack.ts"
+    ]
+}
