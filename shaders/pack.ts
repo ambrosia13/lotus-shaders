@@ -6,11 +6,53 @@ function configure() {
     worldSettings.renderEntityShadow = true;
 }
 
+// composite_sort.ts
+
+class CompositeSort {
+    static sortTexture: BuiltTexture;
+
+    static sortTextureName(): string {
+        return "sortTexture";
+    }
+
+    static setup() {
+        let textureFormat = Format.R11F_G11F_B10F;
+
+        let sortTexture = new Texture(CompositeSort.sortTextureName())
+            .format(textureFormat)
+            .clear(false)
+            .build();
+
+        CompositeSort.sortTexture = sortTexture;
+
+        registerShader(
+            Stage.POST_RENDER,
+            new Composite("Composite Sort Pass")
+                .fragment("programs/post/sort.frag")
+                .target(0, CompositeSort.sortTexture)
+                .build()
+        );
+    }
+}
+
 // bloom.ts
+
 class Bloom {
     static downsampleTexture: BuiltTexture;
     static upsampleTexture: BuiltTexture;
     static mergeTexture: BuiltTexture;
+
+    static downsampleTextureName(): string {
+        return "bloomDownsampleTexture";
+    }
+
+    static upsampleTextureName(): string {
+        return "bloomUpsampleTexture";
+    }
+
+    static mergeTextureName(): string {
+        return "bloomMergeTexture";
+    }
 
     private static calculateMipCount(): number {
         return Math.floor(Math.log2(Math.max(screenWidth, screenHeight)));
@@ -27,19 +69,19 @@ class Bloom {
     private static setupTextures() {
         let textureFormat = Format.R11F_G11F_B10F;
 
-        let downsampleTexture = new Texture("bloomDownsampleTexture")
+        let downsampleTexture = new Texture(Bloom.downsampleTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
             .build();
 
-        let upsampleTexture = new Texture("bloomUpsampleTexture")
+        let upsampleTexture = new Texture(Bloom.upsampleTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
             .build();
 
-        let mergeTexture = new Texture("bloomMergeTexture")
+        let mergeTexture = new Texture(Bloom.mergeTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
@@ -156,21 +198,25 @@ class GbufferTextures {
         this.albedoTexture = new Texture(prefix + "AlbedoTexture")
             .format(Format.RGBA8)
             .clear(true)
+            .clearColor(0, 0, 0, 0)
             .build();
 
         this.normalTexture = new Texture(prefix + "NormalTexture")
             .format(Format.RGBA8)
             .clear(true)
+            .clearColor(0, 0, 0, 0)
             .build();
 
         this.lightTexture = new Texture(prefix + "LightTexture")
             .format(Format.RGBA8)
             .clear(true)
+            .clearColor(0, 0, 0, 0)
             .build();
 
         this.materialTexture = new Texture(prefix + "MaterialTexture")
             .format(Format.RGBA8)
             .clear(true)
+            .clearColor(0, 0, 0, 0)
             .build();
     }
 
@@ -201,22 +247,18 @@ class GbufferTextures {
 class Gbuffer {
     static solid: GbufferTextures;
     static translucent: GbufferTextures;
-    static basic: GbufferTextures;
 
     static setup() {
         print("Gbuffer init");
 
-        Gbuffer.solid = new GbufferTextures("solid", Usage.TERRAIN_SOLID);
+        Gbuffer.solid = new GbufferTextures("solid", Usage.BASIC);
         Gbuffer.translucent = new GbufferTextures("translucent", Usage.TERRAIN_TRANSLUCENT);
-        Gbuffer.basic = new GbufferTextures("basic", Usage.BASIC);
 
         let solidShader = Gbuffer.solid.shader();
         let translucentShader = Gbuffer.translucent.shader();
-        let basicShader = Gbuffer.basic.shader();
 
         registerShader(solidShader);
         registerShader(translucentShader);
-        registerShader(basicShader);
 
         print("Gbuffer finish init");
     }
@@ -235,7 +277,8 @@ function setupShader() {
     configure();
 
     Gbuffer.setup();
-    Bloom.setup(Gbuffer.solid.albedoTexture, Gbuffer.solid.albedoTextureName());
+    CompositeSort.setup();
+    Bloom.setup(CompositeSort.sortTexture, CompositeSort.sortTextureName());
 
     setupFinalPass();
 }
