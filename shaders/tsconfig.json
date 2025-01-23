@@ -9,8 +9,9 @@
         ]
     },
     "files": [
-        "scripts/gbuffer.ts",
-        "scripts/iris.d.ts",
+        // "gbuffer.ts",
+        // "post.ts",
+        "iris.d.ts",
         "pack.ts"
     ]
 }
