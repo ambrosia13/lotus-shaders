@@ -1,3 +1,11 @@
+// config.ts
+
+function configure() {
+    worldSettings.ambientOcclusionLevel = 1.0;
+    worldSettings.disableShade = true;
+    worldSettings.renderEntityShadow = true;
+}
+
 // gbuffer.ts -------------------------------------------------------------------------
 
 class GbufferTextures {
@@ -100,6 +108,8 @@ function setupFinalPass() {
 // pack.ts ----------------------------------------------------------------------------
 
 function setupShader() {
+    configure();
+
     Gbuffer.setup();
 
     setupFinalPass();

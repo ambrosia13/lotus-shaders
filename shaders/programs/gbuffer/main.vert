@@ -11,7 +11,7 @@ out vec4 v_vertexColor;
 
 void iris_sendParameters(VertexData data) {
     vec4 color = data.color;
-    color.rgb = mix(color.rgb, data.overlayColor.rgb, data.overlayColor.a);
+    color.rgb = mix(data.overlayColor.rgb, color.rgb, data.overlayColor.a);
 
     v_atlasCoord = data.uv;
     v_lightCoord = vec3(data.light, data.ao);
