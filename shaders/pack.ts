@@ -71,7 +71,6 @@ class Bloom {
                     .target(0, Bloom.downsampleTexture, i)
                     .define("def_currentLod", "" + i)
                     .define("def_maxLod", "" + mipCount)
-                    .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
                     .build()
             );
         }
@@ -89,7 +88,6 @@ class Bloom {
                 .target(0, Bloom.upsampleTexture, mipCount - 1)
                 .define("def_currentLod", "" + (mipCount - 1))
                 .define("def_maxLod", "" + mipCount)
-                .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
                 .build()
         );
 
@@ -101,7 +99,6 @@ class Bloom {
                     .target(0, Bloom.upsampleTexture, i)
                     .define("def_currentLod", "" + i)
                     .define("def_maxLod", "" + mipCount)
-                    .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
                     .build()
             );
         }
