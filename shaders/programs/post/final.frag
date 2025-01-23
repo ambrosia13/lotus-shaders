@@ -2,7 +2,7 @@
 #include "/programs/lib/frex/color.glsl"
 
 // TODO: workaround because iris doesn't currently support defines in combination pass
-#define def_inputTexture solidAlbedoTexture
+#define def_inputTexture bloomMergeTexture
 
 uniform sampler2D def_inputTexture;
 

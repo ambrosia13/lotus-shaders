@@ -6,6 +6,133 @@ function configure() {
     worldSettings.renderEntityShadow = true;
 }
 
+// bloom.ts
+class Bloom {
+    static downsampleTexture: BuiltTexture;
+    static upsampleTexture: BuiltTexture;
+    static mergeTexture: BuiltTexture;
+
+    private static calculateMipCount(): number {
+        return Math.floor(Math.log2(Math.max(screenWidth, screenHeight)));
+    }
+
+    private static calculateScreenWidth(lod: number): number {
+        return screenWidth >> Bloom.calculateMipCount();
+    }
+
+    private static calculateScreenHeight(lod: number): number {
+        return screenHeight >> Bloom.calculateMipCount();
+    }
+
+    private static setupTextures() {
+        let textureFormat = Format.R11F_G11F_B10F;
+
+        let downsampleTexture = new Texture("bloomDownsampleTexture")
+            .format(textureFormat)
+            .clear(false)
+            .mipmap(true)
+            .build();
+
+        let upsampleTexture = new Texture("bloomUpsampleTexture")
+            .format(textureFormat)
+            .clear(false)
+            .mipmap(true)
+            .build();
+
+        let mergeTexture = new Texture("bloomMergeTexture")
+            .format(textureFormat)
+            .clear(false)
+            .mipmap(true)
+            .build();
+
+        Bloom.downsampleTexture = downsampleTexture;
+        Bloom.upsampleTexture = upsampleTexture;
+        Bloom.mergeTexture = mergeTexture;
+    }
+
+    private static setupDownsampleChain(inputTexture: BuiltTexture, inputTextureName: string) {
+        let mipCount = Bloom.calculateMipCount();
+
+        // The initial copy from the input texture to the bloom downsample texture
+        registerShader(
+            Stage.POST_RENDER,
+            new Composite("Bloom Downsample Pass 0")
+                .fragment("programs/post/copy.frag")
+                .target(0, Bloom.downsampleTexture)
+                .define("def_inputTexture", inputTextureName)
+                .build()
+        );
+
+        for (let i = 1; i < mipCount; i++) {
+            registerShader(
+                Stage.POST_RENDER,
+                new Composite("Bloom Downsample Pass " + i)
+                    .fragment("programs/post/bloom/downsample.frag")
+                    .target(0, Bloom.downsampleTexture, i)
+                    .define("def_currentLod", "" + i)
+                    .define("def_maxLod", "" + mipCount)
+                    .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
+                    .build()
+            );
+        }
+    }
+
+    private static setupUpsampleChain() {
+        let mipCount = Bloom.calculateMipCount();
+
+        // The initial upsample pass, that copies the highest-lod downsample texture to the
+        // highest-lod upsample texture with some small filtering.
+        registerShader(
+            Stage.POST_RENDER,
+            new Composite("Bloom Upsample Pass " + (mipCount - 1))
+                .fragment("programs/post/bloom/upsample_first.frag")
+                .target(0, Bloom.upsampleTexture, mipCount - 1)
+                .define("def_currentLod", "" + (mipCount - 1))
+                .define("def_maxLod", "" + mipCount)
+                .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
+                .build()
+        );
+
+        for (let i = mipCount - 2; i >= 0; i--) {
+            registerShader(
+                Stage.POST_RENDER,
+                new Composite("Bloom Upsample Pass " + i)
+                    .fragment("programs/post/bloom/upsample.frag")
+                    .target(0, Bloom.upsampleTexture, i)
+                    .define("def_currentLod", "" + i)
+                    .define("def_maxLod", "" + mipCount)
+                    .define("def_screenSize", "ivec2(" + screenWidth + "," + screenHeight + ")")
+                    .build()
+            );
+        }
+    }
+
+    private static setupMerge(inputTextureName: string) {
+        let mipCount = Bloom.calculateMipCount();
+
+        registerShader(
+            Stage.POST_RENDER,
+            new Composite("Bloom Merge Pass")
+                .fragment("programs/post/bloom/merge.frag")
+                .target(0, Bloom.mergeTexture)
+                .define("def_maxLod", "" + mipCount)
+                .define("def_inputTexture", inputTextureName)
+                .build()
+        );
+    }
+
+    static setup(inputTexture: BuiltTexture, inputTextureName: string) {
+        Bloom.setupTextures();
+
+        Bloom.setupDownsampleChain(inputTexture, inputTextureName);
+
+        Bloom.setupUpsampleChain();
+
+        Bloom.setupMerge(inputTextureName);
+
+    }
+}
+
 // gbuffer.ts -------------------------------------------------------------------------
 
 class GbufferTextures {
@@ -111,6 +238,7 @@ function setupShader() {
     configure();
 
     Gbuffer.setup();
+    Bloom.setup(Gbuffer.solid.albedoTexture, Gbuffer.solid.albedoTextureName());
 
     setupFinalPass();
 }
