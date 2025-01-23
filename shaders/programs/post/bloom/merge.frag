@@ -13,5 +13,5 @@ void main() {
 
     vec4 mainColor = texture(def_inputTexture, uv);
 
-    t_color = mix(mainColor, bloomColor, 0.5);
+    t_color = mix(mainColor, bloomColor, 0.2);
 }
