@@ -1,3 +1,11 @@
+// util.ts
+
+interface Vec3 {
+    x: number,
+    y: number,
+    z: number
+};
+
 // config.ts
 
 function configure() {
@@ -7,27 +15,26 @@ function configure() {
 }
 
 // atmosphere.ts
+interface AtmosphereSettings {
+    origin: Vec3,
+    unitScale: number,
+
+    groundAlbedo: Vec3,
+
+    groundRadiusMM: number,
+    atmosphereRadiusMM: number,
+
+    rayleighScatteringBase: Vec3,
+    rayleighAbsorptionBase: number,
+
+    mieScatteringBase: number,
+    mieAbsorptionBase: number,
+
+    ozoneAbsorptionBase: Vec3,
+};
+
 class AtmosphereData {
-    atmosphereOriginX: number;
-    atmosphereOriginY: number;
-    atmosphereOriginZ: number;
-
-    groundRadiusMM: number;
-    atmosphereRadiusMM: number;
-
-    rayleighScatteringBaseR: number;
-    rayleighScatteringBaseG: number;
-    rayleighScatteringBaseB: number;
-    rayleighAbsorptionBase: number;
-
-    mieScatteringBase: number;
-    mieAbsorptionBase: number;
-
-    ozoneAbsorptionBaseR: number;
-    ozoneAbsorptionBaseG: number;
-    ozoneAbsorptionBaseB: number;
-
-    unitScale: number;
+    settings: AtmosphereSettings;
 
     name: string;
 
@@ -39,7 +46,7 @@ class AtmosphereData {
         return this.name + "TransmittanceTexture";
     }
 
-    multiscatteringTextureName(): string {
+    scatteringTextureName(): string {
         return this.name + "ScatteringTexture";
     }
 
@@ -47,36 +54,124 @@ class AtmosphereData {
         return this.name + "SkyViewTexture";
     }
 
-    constructor(name: string) {}
+    constructor(
+        name: string,
+        settings: AtmosphereSettings,
+    ) {
+        // transmittance between 0 and 1
+        const transmittanceTextureFormat = Format.RGB16;
+        const scatteringTextureFormat = Format.RGB16F;
+        const skyViewTextureFormat = Format.R11F_G11F_B10F;
 
-    private defineAtmosphereSettingsInShader(pass: Composite) {
-        pass.define("def_atmosphereOrigin", "vec3( +" + this.atmosphereOriginX + "," + this.atmosphereOriginY + "," + this.atmosphereOriginZ + ")");
-        
-        pass.define("def_groundRadiusMM", this.groundRadiusMM.toString());
-        pass.define("def_atmosphereRadiusMM", this.atmosphereRadiusMM.toString());
+        this.settings = settings;
 
-        pass.define("def_rayleighScatteringBase", `vec3({this.rayleighScatteringBaseR},{this.rayleighScatteringBaseG}, {this.rayleighScatteringBaseB})`)
-        pass.define("def_rayleighAbsorptionBase", this.rayleighAbsorptionBase.toString());
+        this.name = name;
 
-        pass.define("def_mieScatteringBase", this.mieScatteringBase.toString());
-        pass.define("def_ozoneAbsorptionBase", 'vec3({this.ozoneAbsorptionBaseR},{this.ozoneAbsorptionBaseG},{this.ozoneAbsorptionBaseB})');
-    
-        pass.define("def_unitScale", this.unitScale.toString());
+        this.transmittanceTexture = new Texture(this.transmittanceTextureName())
+            .format(transmittanceTextureFormat)
+            .clear(false)
+            .width(256)
+            .height(64)
+            .build();
+
+        this.scatteringTexture = new Texture(this.scatteringTextureName())
+            .format(scatteringTextureFormat)
+            .clear(false)
+            .width(32)
+            .height(32)
+            .build();
+
+        this.skyViewTexture = new Texture(this.skyViewTextureName())
+            .format(skyViewTextureFormat)
+            .clear(false)
+            .width(400)
+            .height(400)
+            .build();
+    }
+
+    defineAtmosphereSettingsInShader(pass: Composite) {
+        pass.define("def_atmosphereOrigin", "vec3( +" + this.settings.origin.x + "," + this.settings.origin.y + "," + this.settings.origin.z + ")");
+        pass.define("def_unitScale", this.settings.unitScale.toString());
+
+        pass.define("def_groundAlbedo", "vec3( +" + this.settings.groundAlbedo.x + "," + this.settings.groundAlbedo.y + "," + this.settings.groundAlbedo.z + ")");
+
+        pass.define("def_groundRadiusMM", this.settings.groundRadiusMM.toString());
+        pass.define("def_atmosphereRadiusMM", this.settings.atmosphereRadiusMM.toString());
+
+        pass.define("def_rayleighScatteringBase", "vec3( +" + this.settings.rayleighScatteringBase.x + "," + this.settings.rayleighScatteringBase.y + "," + this.settings.rayleighScatteringBase.z + ")")
+        pass.define("def_rayleighAbsorptionBase", this.settings.rayleighAbsorptionBase.toString());
+
+        pass.define("def_mieScatteringBase", this.settings.mieScatteringBase.toString());
+        pass.define("def_mieAbsorptionBase", this.settings.mieAbsorptionBase.toString());
+
+        pass.define("def_ozoneAbsorptionBase", "vec3( +" + this.settings.ozoneAbsorptionBase.x + "," + this.settings.ozoneAbsorptionBase.y + "," + this.settings.ozoneAbsorptionBase.z + ")");
     }
 
     registerAtmosphereShaders() {
+        const transmittancePass = new Composite(this.name + " Atmosphere Transmittance Pass")
+            .fragment("programs/lut/transmittance.frag")
+            .target(0, this.transmittanceTexture);
+
+        this.defineAtmosphereSettingsInShader(transmittancePass);
+
         registerShader(
             Stage.SCREEN_SETUP,
-            new Composite(this.name + "Atmosphere Transmittance Pass")
-                .fragment("")
-        )
+            transmittancePass.build()
+        );
+
+        const scatteringPass = new Composite(this.name + " Atmosphere Scattering Pass")
+            .fragment("programs/lut/scattering.frag")
+            .target(0, this.scatteringTexture)
+            .define("def_transmittanceTexture", this.transmittanceTextureName());
+
+        this.defineAtmosphereSettingsInShader(scatteringPass);
+
+        registerShader(
+            Stage.SCREEN_SETUP,
+            scatteringPass.build()
+        );
+
+        const skyViewPass = new Composite(this.name + " Atmosphere Sky-View Pass")
+            .fragment("programs/lut/sky_view.frag")
+            .target(0, this.skyViewTexture);
+
+        this.defineAtmosphereSettingsInShader(skyViewPass);
+
+        registerShader(
+            Stage.PRE_RENDER,
+            skyViewPass.build()
+        );
+
     }
 }
 
 class Atmosphere {
-    static transmittanceTexture: BuiltTexture;
-    static multiscatteringTexture: BuiltTexture;
-    static skyViewTexture: BuiltTexture;
+    static earth: AtmosphereData;
+
+    static setup() {
+        Atmosphere.earth = new AtmosphereData(
+            "earth",
+            {
+                origin: { x: 0.0, y: 0.0, z: 0.0 },
+                unitScale: 1.0,
+
+                groundAlbedo: { x: 0.0, y: 0.0, z: 0.0 },
+
+                groundRadiusMM: 6.360,
+                atmosphereRadiusMM: 6.460,
+
+                rayleighScatteringBase: { x: 5.802, y: 13.558, z: 33.1 },
+                rayleighAbsorptionBase: 0.0,
+
+                mieScatteringBase: 25.996,
+                mieAbsorptionBase: 4.4,
+
+                ozoneAbsorptionBase: { x: 0.650, y: 1.881, z: 0.085 },
+            }
+        )
+
+        Atmosphere.earth.registerAtmosphereShaders();
+    }
 }
 
 // composite_sort.ts
@@ -89,22 +184,20 @@ class CompositeSort {
     }
 
     static setup() {
-        let textureFormat = Format.R11F_G11F_B10F;
+        const textureFormat = Format.R11F_G11F_B10F;
 
-        let sortTexture = new Texture(CompositeSort.sortTextureName())
+        const sortTexture = new Texture(CompositeSort.sortTextureName())
             .format(textureFormat)
             .clear(false)
             .build();
 
         CompositeSort.sortTexture = sortTexture;
 
-        registerShader(
-            Stage.POST_RENDER,
-            new Composite("Composite Sort Pass")
-                .fragment("programs/post/sort.frag")
-                .target(0, CompositeSort.sortTexture)
-                .build()
-        );
+        const pass = new Composite("Composite Sort Pass")
+            .fragment("programs/post/sort.frag")
+            .target(0, CompositeSort.sortTexture);
+
+        registerShader(Stage.POST_RENDER, pass.build());
     }
 }
 
@@ -140,21 +233,21 @@ class Bloom {
     }
 
     private static setupTextures() {
-        let textureFormat = Format.R11F_G11F_B10F;
+        const textureFormat = Format.R11F_G11F_B10F;
 
-        let downsampleTexture = new Texture(Bloom.downsampleTextureName())
+        const downsampleTexture = new Texture(Bloom.downsampleTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
             .build();
 
-        let upsampleTexture = new Texture(Bloom.upsampleTextureName())
+        const upsampleTexture = new Texture(Bloom.upsampleTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
             .build();
 
-        let mergeTexture = new Texture(Bloom.mergeTextureName())
+        const mergeTexture = new Texture(Bloom.mergeTextureName())
             .format(textureFormat)
             .clear(false)
             .mipmap(true)
@@ -166,7 +259,7 @@ class Bloom {
     }
 
     private static setupDownsampleChain(inputTexture: BuiltTexture, inputTextureName: string) {
-        let mipCount = Bloom.calculateMipCount();
+        const mipCount = Bloom.calculateMipCount();
 
         // The initial copy from the input texture to the bloom downsample texture
         registerShader(
@@ -192,7 +285,7 @@ class Bloom {
     }
 
     private static setupUpsampleChain() {
-        let mipCount = Bloom.calculateMipCount();
+        const mipCount = Bloom.calculateMipCount();
 
         // The initial upsample pass, that copies the highest-lod downsample texture to the
         // highest-lod upsample texture with some small filtering.
@@ -220,7 +313,7 @@ class Bloom {
     }
 
     private static setupMerge(inputTextureName: string) {
-        let mipCount = Bloom.calculateMipCount();
+        const mipCount = Bloom.calculateMipCount();
 
         registerShader(
             Stage.POST_RENDER,
@@ -340,7 +433,7 @@ class Gbuffer {
 // post.ts ----------------------------------------------------------------------------
 
 function setupFinalPass() {
-    let combinationPass = new CombinationPass("programs/post/final.frag").build();
+    const combinationPass = new CombinationPass("programs/post/final.frag").build();
     setCombinationPass(combinationPass);
 }
 
@@ -348,6 +441,8 @@ function setupFinalPass() {
 
 function setupShader() {
     configure();
+
+    Atmosphere.setup();
 
     Gbuffer.setup();
     CompositeSort.setup();

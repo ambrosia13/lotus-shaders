@@ -2,6 +2,10 @@
 #define HALF_PI    	  1.57079632679489661923 // I prefer a whole pi when I can get it, but I won't say no to half.
 #define TAU           6.2831853071795864769252867665590 // two PI
 
+float pow2(float x) {
+    return x * x;
+}
+
 /*
  * Converts RGB to grayscale.
  */
