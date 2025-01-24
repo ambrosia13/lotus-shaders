@@ -1,3 +1,3 @@
-All of the code in this directory is taken from [FREX](https://github.com/vram-guild/frex), which uses the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) license. It may be slightly modified to fit my personal style or Iris's API.
+All of the code in this directory is taken from [FREX](https://github.com/vram-guild/frex), which uses the [LGPLv3](https://www.gnu.org/licenses/lgpl-3.0.en.html) license. It may be slightly modified to fit my personal style or Iris's API.
 
 It is used in Lotus Shaders because much of Lotus's code is based off of Forget-me-not Shaders, which was a [Canvas](https://github.com/vram-guild/canvas) pack and thus had free access to FREX shader libraries.
