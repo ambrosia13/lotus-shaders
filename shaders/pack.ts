@@ -6,6 +6,79 @@ function configure() {
     worldSettings.renderEntityShadow = true;
 }
 
+// atmosphere.ts
+class AtmosphereData {
+    atmosphereOriginX: number;
+    atmosphereOriginY: number;
+    atmosphereOriginZ: number;
+
+    groundRadiusMM: number;
+    atmosphereRadiusMM: number;
+
+    rayleighScatteringBaseR: number;
+    rayleighScatteringBaseG: number;
+    rayleighScatteringBaseB: number;
+    rayleighAbsorptionBase: number;
+
+    mieScatteringBase: number;
+    mieAbsorptionBase: number;
+
+    ozoneAbsorptionBaseR: number;
+    ozoneAbsorptionBaseG: number;
+    ozoneAbsorptionBaseB: number;
+
+    unitScale: number;
+
+    name: string;
+
+    transmittanceTexture: BuiltTexture;
+    scatteringTexture: BuiltTexture;
+    skyViewTexture: BuiltTexture;
+
+    transmittanceTextureName(): string {
+        return this.name + "TransmittanceTexture";
+    }
+
+    multiscatteringTextureName(): string {
+        return this.name + "ScatteringTexture";
+    }
+
+    skyViewTextureName(): string {
+        return this.name + "SkyViewTexture";
+    }
+
+    constructor(name: string) {}
+
+    private defineAtmosphereSettingsInShader(pass: Composite) {
+        pass.define("def_atmosphereOrigin", "vec3( +" + this.atmosphereOriginX + "," + this.atmosphereOriginY + "," + this.atmosphereOriginZ + ")");
+        
+        pass.define("def_groundRadiusMM", this.groundRadiusMM.toString());
+        pass.define("def_atmosphereRadiusMM", this.atmosphereRadiusMM.toString());
+
+        pass.define("def_rayleighScatteringBase", `vec3({this.rayleighScatteringBaseR},{this.rayleighScatteringBaseG}, {this.rayleighScatteringBaseB})`)
+        pass.define("def_rayleighAbsorptionBase", this.rayleighAbsorptionBase.toString());
+
+        pass.define("def_mieScatteringBase", this.mieScatteringBase.toString());
+        pass.define("def_ozoneAbsorptionBase", 'vec3({this.ozoneAbsorptionBaseR},{this.ozoneAbsorptionBaseG},{this.ozoneAbsorptionBaseB})');
+    
+        pass.define("def_unitScale", this.unitScale.toString());
+    }
+
+    registerAtmosphereShaders() {
+        registerShader(
+            Stage.SCREEN_SETUP,
+            new Composite(this.name + "Atmosphere Transmittance Pass")
+                .fragment("")
+        )
+    }
+}
+
+class Atmosphere {
+    static transmittanceTexture: BuiltTexture;
+    static multiscatteringTexture: BuiltTexture;
+    static skyViewTexture: BuiltTexture;
+}
+
 // composite_sort.ts
 
 class CompositeSort {
