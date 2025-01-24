@@ -18,6 +18,7 @@ function configure() {
 interface AtmosphereSettings {
     origin: Vec3,
     unitScale: number,
+    playerRelative: boolean,
 
     groundAlbedo: Vec3,
 
@@ -92,6 +93,7 @@ class AtmosphereData {
     defineAtmosphereSettingsInShader(pass: Composite) {
         pass.define("def_atmosphereOrigin", "vec3( +" + this.settings.origin.x + "," + this.settings.origin.y + "," + this.settings.origin.z + ")");
         pass.define("def_unitScale", this.settings.unitScale.toString());
+        pass.define("def_playerRelative", this.settings.playerRelative.toString());
 
         pass.define("def_groundAlbedo", "vec3( +" + this.settings.groundAlbedo.x + "," + this.settings.groundAlbedo.y + "," + this.settings.groundAlbedo.z + ")");
 
@@ -133,7 +135,9 @@ class AtmosphereData {
 
         const skyViewPass = new Composite(this.name + " Atmosphere Sky-View Pass")
             .fragment("programs/lut/sky_view.frag")
-            .target(0, this.skyViewTexture);
+            .target(0, this.skyViewTexture)
+            .define("def_transmittanceTexture", this.transmittanceTextureName())
+            .define("def_scatteringTexture", this.scatteringTextureName());
 
         this.defineAtmosphereSettingsInShader(skyViewPass);
 
@@ -154,6 +158,7 @@ class Atmosphere {
             {
                 origin: { x: 0.0, y: 0.0, z: 0.0 },
                 unitScale: 1.0,
+                playerRelative: true,
 
                 groundAlbedo: { x: 0.0, y: 0.0, z: 0.0 },
 

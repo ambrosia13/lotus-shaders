@@ -1,3 +1,6 @@
+#ifndef INCLUDE_LIB_FILTER
+#define INCLUDE_LIB_FILTER
+
 // Temporally stable box filter, as described by Jorge Jiminez, 2014
 // http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
 vec4 frx_sample13(sampler2D tex, vec2 uv, vec2 dist, int lod) {
@@ -43,3 +46,5 @@ vec4 frx_sampleTent(sampler2D tex, vec2 uv, vec2 dist, int lod) {
 
 	return sum * (1.0 / 16.0);
 }
+
+#endif

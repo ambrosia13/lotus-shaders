@@ -1,5 +1,3 @@
-// Uniform data for reference; uses C header file extension to prevent confusion with .glsl files
-
 struct GameData {
     vec2 screenSize; // 0
     bool guiHidden; // 8

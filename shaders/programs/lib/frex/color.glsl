@@ -1,3 +1,6 @@
+#ifndef INCLUDE_LIB_COLOR
+#define INCLUDE_LIB_COLOR
+
 #define FRX_GAMMA 2.2
 #define FRX_INVERSE_GAMMA (1.0 / FRX_GAMMA)
 
@@ -41,3 +44,5 @@ vec3 frx_toneMap(vec3 color) {
 	color = FRX_RRT_AND_ODTF_FIT(color);
 	return FRX_ACES_OUTPUT_MATRIX * color;
 }
+
+#endif

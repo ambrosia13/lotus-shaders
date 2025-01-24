@@ -5,25 +5,28 @@
 // Minimal code changes; modified for my use case. Original Shadertoy code released under the MIT License.
 // --------------------------------------------------------------------------------------------------------
 
+#ifndef INCLUDE_LIB_HILLAIRE
+#define INCLUDE_LIB_HILLAIRE
+
 #include "/programs/lib/frex/math.glsl"
 
-const vec3 atmosphereOrigin = def_atmosphereOrigin;
-const float unitScale = def_unitScale;
+vec3 getSkyViewPos() {
+	if (def_playerRelative) {
+		float altitudeMeters = 500.0 + (ap.camera.pos.y - 128.0);
+		return vec3(0.0, def_groundRadiusMM + altitudeMeters * 1e-6, 0.0);
+	} else {
+		return (ap.camera.pos - def_atmosphereOrigin) * 1e-6;
+	}
+}
 
-// Units are in megameters.
-const float groundRadiusMM = def_groundRadiusMM;
-const float atmosphereRadiusMM = def_atmosphereRadiusMM;
-
-const vec3 groundAlbedo = def_groundAlbedo;
-
-// Units are per-megameter
-const vec3 rayleighScatteringBase = def_rayleighScatteringBase;
-const float rayleighAbsorptionBase = def_rayleighAbsorptionBase;
-
-const float mieScatteringBase = def_mieScatteringBase;
-const float mieAbsorptionBase = def_mieAbsorptionBase;
-
-const vec3 ozoneAbsorptionBase = def_ozoneAbsorptionBase;
+vec3 getSkyViewPos(vec3 cameraPosition) {
+	if (def_playerRelative) {
+		float altitudeMeters = 500.0 + (cameraPosition.y - 128.0);
+		return vec3(0.0, def_groundRadiusMM + altitudeMeters * 1e-6, 0.0);
+	} else {
+		return (cameraPosition - def_atmosphereOrigin) * 1e-6;
+	}
+}
 
 // Phase function from Jessie
 // https://www.patreon.com/user?u=49201970
@@ -47,14 +50,12 @@ float getRayleighPhase(float cosTheta) {
 	return 0.05968310365 * (1.0 + cosTheta * cosTheta);
 }
 
-float getDistanceToPlanetCenterMM(vec3 position) {
-    // position and atmosphereOrigin are in units of minecraft blocks aka meters,
-    // so divided by 1e6 to be in units of megameters
-    return distance(position, def_atmosphereOrigin) * def_unitScale / 1e6;
+float getDistanceToPlanetCenter(vec3 positionMM) {
+    return length(positionMM);
 }
 
-float getAltitudeMM(vec3 position) {
-    return getDistanceToPlanetCenterMM(position) - groundRadiusMM;
+float getAltitude(vec3 position) {
+    return getDistanceToPlanetCenter(position) - def_groundRadiusMM;
 }
 
 void getScatteringValues(
@@ -64,7 +65,7 @@ void getScatteringValues(
 	out float mieScattering,
 	out vec3 extinction
 ) {
-	float altitudeKM = (distance(pos, def_atmosphereOrigin) - groundRadiusMM) * 1000.0;
+	float altitudeKM = getAltitude(pos) * 1000.0;
 
 	// Note: Paper gets these switched up.
 	float rayleighDensity = exp(-altitudeKM / 8.0);
@@ -98,25 +99,25 @@ float rayIntersectSphere(vec3 ro, vec3 rd, float rad) {
 }
 
 vec3 getValFromTLUT(sampler2D tex, vec3 pos, vec3 sunDir) {
-	float height = getDistanceToPlanetCenterMM(pos);
-	vec3 up = normalize(pos - def_atmosphereOrigin);
+	float height = getDistanceToPlanetCenter(pos);
+	vec3 up = normalize(pos);
     
 	float sunCosZenithAngle = dot(sunDir, up);
 
 	vec2 uv = vec2(clamp(0.5 + 0.5 * sunCosZenithAngle, 0.0, 1.0),
-				max(0.0, min(1.0, (height - groundRadiusMM) / (atmosphereRadiusMM - groundRadiusMM))));
+				max(0.0, min(1.0, (height - def_groundRadiusMM) / (def_atmosphereRadiusMM - def_groundRadiusMM))));
 				
 	return texture(tex, uv).rgb;
 }
 
 vec3 getValFromMultiScattLUT(sampler2D tex, vec3 pos, vec3 sunDir) {
-	float height = getDistanceToPlanetCenterMM(pos);
-	vec3 up = normalize(pos - def_atmosphereOrigin);
+	float height = getDistanceToPlanetCenter(pos);
+	vec3 up = normalize(pos);
     
 	float sunCosZenithAngle = dot(sunDir, up);
 	
     vec2 uv = vec2(clamp(0.5 + 0.5 * sunCosZenithAngle, 0.0, 1.0),
-				max(0.0, min(1.0, (height - groundRadiusMM) / (atmosphereRadiusMM - groundRadiusMM))));
+				max(0.0, min(1.0, (height - def_groundRadiusMM) / (def_atmosphereRadiusMM - def_groundRadiusMM))));
 	
 	return texture(tex, uv).rgb;
 }
@@ -135,9 +136,6 @@ vec3 raymarchScattering(
 	sampler2D multiscatteringLut,
 	vec3 sunColor
 ) {
-    // mc units are meters, so convert to MM
-    pos /= 1e6;
-
 	float cosTheta = dot(rayDir, sunDir);
 	
 	float miePhaseValue = getMiePhase(cosTheta);
@@ -176,3 +174,34 @@ vec3 raymarchScattering(
     
 	return lum;
 }
+
+vec3 getValFromSkyLUT(vec3 rayDir, vec3 sunDir, sampler2D skyLut) {
+	vec3 skyViewPos = getSkyViewPos();
+
+	float height = length(skyViewPos);
+	vec3 up = skyViewPos * rcp(height);
+	
+	float horizonAngle = safeacos(sqrt(height * height - groundRadiusMM * groundRadiusMM) / height);
+	float altitudeAngle = horizonAngle - acos(dot(rayDir, up)); // Between -PI/2 and PI/2
+	float azimuthAngle; // Between 0 and 2*PI
+	if (abs(altitudeAngle) > (HALF_PI - .0001)) {
+		// Looking nearly straight up or down.
+		azimuthAngle = 0.0;
+	} else {
+		vec3 right = cross(sunDir, up);
+		vec3 forward = cross(up, right);
+		
+		vec3 projectedDir = normalize(rayDir - up*(dot(rayDir, up)));
+		float sinTheta = dot(projectedDir, right);
+		float cosTheta = dot(projectedDir, forward);
+		azimuthAngle = atan(sinTheta, cosTheta) + PI;
+	}
+	
+	// Non-linear mapping of altitude angle. See Section 5.3 of the paper.
+	float v = 0.5 + 0.5*sign(altitudeAngle)*sqrt(abs(altitudeAngle)*2.0/PI);
+	vec2 uv = vec2(azimuthAngle / (TAU), v);
+	
+	return texture(skyLut, uv).rgb;
+}
+
+#endif
